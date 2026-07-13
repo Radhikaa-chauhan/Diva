@@ -44,6 +44,8 @@ class GenerationError(Exception):
 async def generate(selfie_bytes: bytes, prompt_template: str) -> GenerationResult:
     if settings.flux_api_key:
         return await _generate_with_fal(selfie_bytes, prompt_template)
+    if settings.huggingface_api_key:
+        return await _generate_with_huggingface(selfie_bytes, prompt_template)
     return await _generate_mock(selfie_bytes, prompt_template)
 
 
@@ -115,5 +117,46 @@ async def _generate_with_fal(selfie_bytes: bytes, prompt_template: str) -> Gener
         image_bytes=image_resp.content,
         content_type=image_resp.headers.get("content-type", "image/jpeg"),
         cost_usd=0.035,
+        prompt_used=prompt_template,
+    )
+
+
+async def _generate_with_huggingface(selfie_bytes: bytes, prompt_template: str) -> GenerationResult:
+    headers = {"Authorization": f"Bearer {settings.huggingface_api_key}"}
+    api_url = f"https://api-inference.huggingface.co/models/{settings.huggingface_model}"
+    
+    is_img2img = any(x in settings.huggingface_model.lower() for x in ["img2img", "image-to-image", "controlnet", "ip-adapter"])
+    
+    async with httpx.AsyncClient(timeout=90) as client:
+        if is_img2img:
+            params = {"prompt": prompt_template}
+            resp = await client.post(
+                api_url,
+                headers=headers,
+                params=params,
+                content=selfie_bytes
+            )
+        else:
+            # Fallback to Text-to-Image (since FLUX.1-schnell is serverless & free, it's the most common target)
+            resp = await client.post(
+                api_url,
+                headers=headers,
+                json={"inputs": prompt_template}
+            )
+            
+        if resp.status_code != 200:
+            error_detail = resp.text
+            try:
+                error_detail = resp.json().get("error", resp.text)
+            except Exception:
+                pass
+            raise GenerationError(f"Hugging Face API returned status {resp.status_code}: {error_detail}")
+            
+        image_bytes = resp.content
+
+    return GenerationResult(
+        image_bytes=image_bytes,
+        content_type="image/jpeg",
+        cost_usd=0.0,
         prompt_used=prompt_template,
     )
