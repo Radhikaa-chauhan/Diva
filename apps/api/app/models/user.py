@@ -33,5 +33,5 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # Relationship — lazy loaded to avoid N+1 on user queries
+    # Relationship : lazy loaded to avoid N+1 on user queries
     jobs = relationship("GenerationJob", back_populates="user", lazy="dynamic")
