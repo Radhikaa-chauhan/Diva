@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,8 +18,16 @@ class JobStatus(StrEnum):
 
 class GenerationJob(Base):
     __tablename__ = "generation_jobs"
+    __table_args__ = (
+        Index("idx_jobs_user_created", "user_id", "created_at"),
+        Index("idx_jobs_user_latency", "user_id", "latency_ms"),
+        Index("idx_jobs_user_cost", "user_id", "cost_usd"),
+        Index("idx_jobs_user_status", "user_id", "status"),
+        Index("idx_jobs_user_favorite", "user_id", "is_favorite"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     reference_photo_id: Mapped[str] = mapped_column(String(36), ForeignKey("reference_photos.id"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default=JobStatus.PENDING, index=True)
