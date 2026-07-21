@@ -18,7 +18,9 @@ The inspiration photo itself is never uploaded or stored (ADR-3 / TRD §10)
 input to the vision-analysis API call.
 """
 import asyncio
+import base64
 import json
+import logging
 import os
 import sys
 
@@ -28,6 +30,8 @@ from app.database import Base, SessionLocal, engine
 from app.models.reference_photo import ReferencePhoto
 from app.services import storage
 from app.services.flux import generate
+
+logger = logging.getLogger(__name__)
 
 VISION_PROMPT = (
     "Describe this photo as a structured photography brief for someone "
@@ -43,13 +47,15 @@ def _draft_from_inspiration(image_path: str) -> dict:
     if not api_key:
         raise SystemExit("Set ANTHROPIC_API_KEY to run vision analysis for curation.")
 
+    logger.info("Reading inspiration image from %s", image_path)
     with open(image_path, "rb") as f:
         image_bytes = f.read()
-
-    import base64
+    logger.info("Inspiration image loaded: size_bytes=%s", len(image_bytes))
 
     media_type = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
     client = anthropic.Anthropic(api_key=api_key)
+
+    logger.info("Sending image to Claude vision API for analysis")
     response = client.messages.create(
         model="claude-opus-4-8",
         max_tokens=1024,
@@ -71,7 +77,18 @@ def _draft_from_inspiration(image_path: str) -> dict:
         ],
     )
     text = response.content[0].text
-    return json.loads(text)
+    logger.info("Claude vision API response received: %s chars", len(text))
+
+    try:
+        style = json.loads(text)
+    except json.JSONDecodeError as exc:
+        logger.error("Failed to parse Claude response as JSON: %s", exc)
+        logger.error("Raw response: %s", text)
+        raise SystemExit(
+            f"Claude returned invalid JSON. Raw response:\n{text}"
+        ) from exc
+
+    return style
 
 
 def _build_prompt_template(style: dict) -> str:
@@ -91,6 +108,8 @@ def main() -> None:
         raise SystemExit("Usage: python -m app.curate path/to/inspiration.jpg")
 
     image_path = sys.argv[1]
+    logger.info("Curation started for image: %s", image_path)
+
     print("Analyzing inspiration photo...")
     style = _draft_from_inspiration(image_path)
     prompt_template = _build_prompt_template(style)
@@ -107,6 +126,7 @@ def main() -> None:
         prompt_template = edited
 
     print("Generating thumbnail from prompt_template (not from the inspiration photo)...")
+    logger.info("Generating thumbnail for preset '%s'", title)
 
     async def _make_thumbnail() -> bytes:
         with open(image_path, "rb") as f:
@@ -116,6 +136,7 @@ def main() -> None:
 
     thumbnail_bytes = asyncio.run(_make_thumbnail())
     thumbnail_url = storage.save_bytes("thumbnails", "thumb.jpg", thumbnail_bytes)
+    logger.info("Thumbnail saved at url=%s", thumbnail_url)
 
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
@@ -131,6 +152,7 @@ def main() -> None:
             )
         )
         db.commit()
+        logger.info("Preset '%s' saved to database", title)
     finally:
         db.close()
 

@@ -26,7 +26,7 @@ def health() -> dict:
         },
     }
 
-    # In your main FastAPI app file:
+
 @router.get("/health/db")
 def db_health():
     """Health probe for database pool status"""

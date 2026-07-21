@@ -31,6 +31,9 @@ def _sanitize_db_url(url: str) -> str:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # ── Environment ───────────────────────────────────────────────────
+    environment: str = "development"
+
     # ── Database ──────────────────────────────────────────────────────
     database_url: str = "postgresql://postgres:postgres@localhost:5432/diva"
     db_pool_size: int = 20
