@@ -79,7 +79,8 @@ class TestStorageService(unittest.TestCase):
         mock_s3.generate_presigned_url.return_value = "https://s3.amazonaws.com/mybucket/results/123.jpg"
 
         url = save_bytes("results", "photo.jpg", b"image bytes")
-        self.assertEqual(url, "https://s3.amazonaws.com/mybucket/results/123.jpg")
+        self.assertIn(".amazonaws.com/results/", url)
+        self.assertNotIn("X-Amz", url)  # G9: no expiring presigned URL in the DB
         mock_s3.put_object.assert_called_once()
 
     @patch("app.services.storage._get_s3_client")
@@ -124,21 +125,26 @@ class TestStorageService(unittest.TestCase):
 
     @patch("app.services.storage._get_s3_client")
     def test_url_generation(self, mock_get_s3_client):
-        """Verify presigned S3 URL vs local URL generation."""
-        # 1. S3 Presigned URL
+        """Public prefixes get stable URLs; private keys get presigned; local gets /storage/."""
         mock_s3 = MagicMock()
         mock_s3.generate_presigned_url.return_value = "https://s3.amazonaws.com/presigned_url"
         mock_get_s3_client.return_value = mock_s3
 
-        s3_url = url_for("results/test.jpg", expiry_seconds=3600)
-        self.assertEqual(s3_url, "https://s3.amazonaws.com/presigned_url")
-        mock_s3.generate_presigned_url.assert_called_with(
-            "get_object",
-            Params={"Bucket": MagicMock(), "Key": "results/test.jpg"},
-            ExpiresIn=3600,
+        # 1. Public feed content: stable object URL, never presigned (G9)
+        result_url = url_for("results/test.jpg")
+        self.assertIn(".amazonaws.com/results/test.jpg", result_url)
+        self.assertNotIn("X-Amz", result_url)
+        mock_s3.generate_presigned_url.assert_not_called()
+
+        # 2. Private objects (selfies): presigned
+        selfie_url = url_for("selfies/test.jpg", expiry_seconds=3600)
+        self.assertEqual(selfie_url, "https://s3.amazonaws.com/presigned_url")
+        self.assertEqual(
+            mock_s3.generate_presigned_url.call_args.kwargs["Params"]["Key"],
+            "selfies/test.jpg",
         )
 
-        # 2. Local Storage URL
+        # 3. Local storage URL
         mock_get_s3_client.return_value = None
         local_url = url_for("results/test.jpg")
         self.assertIn("/storage/results/test.jpg", local_url)
