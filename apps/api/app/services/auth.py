@@ -232,6 +232,13 @@ def _verify_google_token(token: str) -> dict | None:
     Requires `google-auth` (pip install google-auth) and
     settings.google_client_id.
     """
+    if not getattr(settings, "google_client_id", None):
+        logger.error(
+            "Google login attempted but GOOGLE_CLIENT_ID is not configured — "
+            "set it in .env to enable Google sign-in."
+        )
+        return None
+
     try:
         # pyrefly: ignore [missing-import]
         from google.auth.transport import requests as google_requests
