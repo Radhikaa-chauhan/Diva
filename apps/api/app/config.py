@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     email_token_expire_hours: int = 24
     password_reset_token_expire_minutes: int = 15
 
+    # ── Social OAuth ──────────────────────────────────────────────────
+    # Google Cloud Console → Credentials → OAuth 2.0 Client ID (Web).
+    # Unset = Google login is disabled (clean 401, not a crash).
+    google_client_id: str | None = None
+
     # ── Email (SMTP) ──────────────────────────────────────────────────
     # Unset in dev = emails are logged, not sent.
     smtp_host: str | None = None
