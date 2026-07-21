@@ -182,15 +182,26 @@ def save_bytes(subdir: str, filename_hint: str, data: bytes) -> str:
         logger.error("Atomic local file write failed for key=%s: %s", key, exc)
         raise IOError(f"Failed to write file locally: {exc}") from exc
 
-    result_url = url_for(key)
+    # Local fallback must return a LOCAL url — url_for() would point at S3
+    # where this object does not exist.
+    result_url = f"{settings.public_base_url}/storage/{key}"
     logger.info("File saved atomically to local storage: key=%s, size=%d bytes, url=%s", key, len(data), result_url)
     return result_url
 
 
+# Feed content: these objects must have stable, never-expiring URLs (bug G9).
+# Requires an S3 bucket policy granting public read on these prefixes.
+PUBLIC_PREFIXES = ("results/", "thumbnails/")
+
+
 def url_for(key: str, expiry_seconds: int = DEFAULT_PRESIGNED_EXPIRY_SECONDS) -> str:
-    """Generate public URL or presigned S3 URL for a given storage key."""
+    """Generate a stable public URL (feed content) or presigned S3 URL (private objects)."""
     s3_client = _get_s3_client()
     if s3_client:
+        if key.startswith(PUBLIC_PREFIXES):
+            return f"https://{settings.aws_s3_bucket_name}.s3.{settings.aws_region}.amazonaws.com/{key}"
+        # ponytail: private objects (selfies) keep 7-day presigned URLs stored in DB;
+        # dashboard selfie previews go stale after that. Presign-on-read if it matters.
         try:
             return s3_client.generate_presigned_url(
                 "get_object",
