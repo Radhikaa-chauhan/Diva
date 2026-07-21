@@ -38,6 +38,7 @@ from app.services.auth import (
     verify_password,
     verify_social_token,
 )
+from app.services.email import send_email
 from app.services.rate_limiter import login_rate_limiter, rate_limit_login
 
 logger = logging.getLogger(__name__)
@@ -83,13 +84,12 @@ def signup(body: UserSignup, db: Session = Depends(get_db)) -> TokenResponse:
     db.commit()
     db.refresh(user)
 
-    logger.info(
-        "🔑 User signed up: user_id=%s, email=%s. OTP Code: %s (Expires at %s)",
-        user.id,
+    send_email(
         user.email,
-        otp_code,
-        otp_expires_at.isoformat(),
+        "Your Diva verification code",
+        f"Welcome to Diva!\n\nYour verification code is: {otp_code}\n\nIt expires in 10 minutes.",
     )
+    logger.info("User signed up: user_id=%s, verification OTP emailed", user.id)
 
     return _build_token_response(user)
 
@@ -217,7 +217,12 @@ def resend_verification(
     user = db.scalars(select(User).where(User.email == body.email)).first()
     if user and not user.is_email_verified:
         token = create_email_verify_token(user.id)
-        logger.info("Verification token generated for email=%s: %s", user.email, token)
+        send_email(
+            user.email,
+            "Verify your Diva email",
+            f"Your email verification token:\n\n{token}\n\nIt expires in {settings.email_token_expire_hours} hours.",
+        )
+        logger.info("Verification token emailed for user_id=%s", user.id)
 
     return MessageResponse(
         message="If an unverified account with that email exists, a verification link has been sent."
@@ -237,11 +242,14 @@ def send_otp(
         user.otp_code = otp_code
         user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         db.commit()
-        logger.info("🔑 OTP code generated for email=%s: %s (expires in 10 mins)", user.email, otp_code)
-        return MessageResponse(
-            message=f"An OTP code has been sent to {user.email}. Code: {otp_code}"
+        send_email(
+            user.email,
+            "Your Diva login code",
+            f"Your one-time code is: {otp_code}\n\nIt expires in 10 minutes.",
         )
+        logger.info("OTP generated and emailed for user_id=%s", user.id)
 
+    # Same response either way — never reveal account existence, never leak the code.
     return MessageResponse(
         message="If an account with that email exists, an OTP code has been sent."
     )
@@ -293,12 +301,14 @@ def forgot_password(
     user = db.scalars(select(User).where(User.email == body.email)).first()
     if user and user.is_active:
         reset_token = create_password_reset_token(user.id)
-        logger.info(
-            "Password reset token generated for user_id=%s, email=%s: %s",
-            user.id,
+        send_email(
             user.email,
-            reset_token,
+            "Reset your Diva password",
+            f"Your password reset token:\n\n{reset_token}\n\n"
+            f"It expires in {settings.password_reset_token_expire_minutes} minutes. "
+            "If you didn't request this, ignore this email.",
         )
+        logger.info("Password reset token emailed for user_id=%s", user.id)
 
     # Standard security practice: return success regardless to prevent user enumeration
     return MessageResponse(
