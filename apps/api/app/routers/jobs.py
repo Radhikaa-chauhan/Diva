@@ -8,7 +8,6 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import asc, desc, func, nulls_last, or_, select
 from sqlalchemy.orm import Session, joinedload
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.database import get_db
 from app.deps import get_current_user
@@ -36,9 +35,6 @@ _VALID_STATUS_VALUES = {s.value for s in JobStatus}
 MAX_SELFIE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 CACHE_TTL_SECONDS = 300  # 5 minutes
-RETRY_ATTEMPTS = 3
-RETRY_MIN_WAIT = 2
-RETRY_MAX_WAIT = 10
 
 
 # ── Monitoring Placeholders ─────────────────────────────────────────────
@@ -279,21 +275,6 @@ def build_paginated_job_history(
     )
 
 
-@retry(
-    stop=stop_after_attempt(RETRY_ATTEMPTS),
-    wait=wait_exponential(multiplier=1, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
-)
-async def _run_job_with_retry(job_id: str) -> None:
-    """Run job with automatic retry on failure."""
-    try:
-        await run_job(job_id)
-        logger.info("Job completed successfully: job_id=%s", job_id)
-    except Exception as e:
-        logger.error("Job execution failed: job_id=%s, error=%s", job_id, str(e))
-        # Tenacity will retry; if all attempts fail, exception propagates
-        raise
-
-
 @router.post("", response_model=JobCreateOut, status_code=202)
 async def create_job(
     background_tasks: BackgroundTasks,
@@ -363,8 +344,11 @@ async def create_job(
     # Invalidate stats cache
     stats_cache.invalidate(current_user.id)
 
-    # Queue job for background processing with retry
-    background_tasks.add_task(_run_job_with_retry, job.id)
+    # Queue job for background processing. Retries live INSIDE run_job's
+    # attempt loop — the only retry layer (was triple-nested before, G6).
+    # Selfie bytes are passed through so the worker doesn't re-download
+    # from S3/HTTP what we already have in memory (G8).
+    background_tasks.add_task(run_job, job.id, data)
     logger.info("Job created and queued: job_id=%s, user_id=%s", job.id, current_user.id)
 
     return JobCreateOut(job_id=job.id, status=job.status, created_at=job.created_at)
