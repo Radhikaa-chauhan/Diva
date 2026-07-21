@@ -22,7 +22,9 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   failed: "Generation failed",
 };
 
-const POLL_INTERVAL_MS = 1500;
+const POLL_INITIAL_MS = 1500;
+const POLL_MAX_MS = 15000;
+const POLL_MAX_ATTEMPTS = 60;
 
 export default function Home() {
   const { isLoggedIn } = useAuth();
@@ -42,7 +44,7 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("All");
 
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchReferences()
@@ -53,23 +55,35 @@ export default function Home() {
   useEffect(() => {
     if (!jobId) return;
 
+    let attemptCount = 0;
+    let currentInterval = POLL_INITIAL_MS;
+
     const poll = async () => {
+      attemptCount++;
       try {
         const result = await fetchJob(jobId);
         setJob(result);
         if (result.status === "complete" || result.status === "failed") {
-          if (pollTimer.current) clearInterval(pollTimer.current);
+          return; // Stop polling
         }
       } catch (err) {
         setSubmitError((err as Error).message);
-        if (pollTimer.current) clearInterval(pollTimer.current);
+        return; // Stop polling on error
       }
+
+      if (attemptCount >= POLL_MAX_ATTEMPTS) {
+        setSubmitError("Generation is taking longer than expected. Check your dashboard for updates.");
+        return; // Stop polling
+      }
+
+      // Exponential backoff: double interval each time, up to max
+      currentInterval = Math.min(currentInterval * 1.5, POLL_MAX_MS);
+      pollTimer.current = setTimeout(poll, currentInterval);
     };
 
     poll();
-    pollTimer.current = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
+      if (pollTimer.current) clearTimeout(pollTimer.current);
     };
   }, [jobId]);
 
