@@ -1,7 +1,7 @@
 """Unit tests for OTP generation, OTP verification, and OTP auth endpoints."""
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -52,6 +52,11 @@ class TestOTPAuthentication(unittest.TestCase):
         user.is_email_verified = False
         user.otp_code = "654321"
         user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        # UserOut.model_validate needs real field types, not MagicMocks
+        user.display_name = "Test User"
+        user.avatar_url = None
+        user.generation_count = 0
+        user.created_at = datetime.now(timezone.utc)
 
         db = MagicMock()
         db.scalars.return_value.first.return_value = user
@@ -62,6 +67,24 @@ class TestOTPAuthentication(unittest.TestCase):
         self.assertTrue(user.is_email_verified)
         self.assertIsNone(user.otp_code)
         self.assertIsNotNone(response.access_token)
+
+    def test_send_otp_never_leaks_code(self):
+        """A3 regression: OTP goes to email, never into the API response."""
+        user = MagicMock()
+        user.id = "user_otp_2"
+        user.email = "test@diva.ai"
+
+        db = MagicMock()
+        db.scalars.return_value.first.return_value = user
+
+        with patch("app.routers.auth.send_email") as mock_send:
+            response = send_otp(SendOtpRequest(email="test@diva.ai"), db=db)
+
+        # Code emailed…
+        mock_send.assert_called_once()
+        self.assertRegex(mock_send.call_args.args[2], r"\d{6}")
+        # …but absent from the response
+        self.assertNotRegex(response.message, r"\d{6}")
 
 
 if __name__ == "__main__":
