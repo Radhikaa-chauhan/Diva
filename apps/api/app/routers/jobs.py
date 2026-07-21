@@ -367,7 +367,7 @@ async def create_job(
     background_tasks.add_task(_run_job_with_retry, job.id)
     logger.info("Job created and queued: job_id=%s, user_id=%s", job.id, current_user.id)
 
-    return JobCreateOut(job_id=job.id)
+    return JobCreateOut(job_id=job.id, status=job.status, created_at=job.created_at)
 
 
 @router.get("", response_model=PaginatedResponse[JobHistoryOut])
