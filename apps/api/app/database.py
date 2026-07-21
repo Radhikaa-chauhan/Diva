@@ -11,8 +11,6 @@ Features:
 - WAL mode PRAGMA initialization for SQLite file-based databases
 - Standardized logging levels across database lifecycle events
 """
-from anthropic.types.beta import beta_base64_pdf_block_param
-from anthropic.types.beta import beta_base64_pdf_block_param
 import logging
 import time
 from collections.abc import Generator
