@@ -72,9 +72,13 @@ class Settings(BaseSettings):
     rate_limit_per_hour: int = 20  # Maximum image generation jobs per user per hour
 
     # ── Image Generation ──────────────────────────────────────────────
-    # Hugging Face Serverless API credentials (Primary)
+    # Hugging Face Inference Providers credentials (Primary).
+    # Model must support image-to-image so the selfie is actually used.
     huggingface_api_key: str | None = None
-    huggingface_model: str = "black-forest-labs/FLUX.1-schnell"
+    huggingface_model: str = "black-forest-labs/FLUX.1-Kontext-dev"
+    # Dev-only escape hatch: sepia mock instead of a hard failure when the
+    # provider is down/unconfigured. Ignored outside development/test/local.
+    allow_mock_fallback: bool = False
 
     # ── Limits ────────────────────────────────────────────────────────
     max_selfie_size_mb: int = 10
