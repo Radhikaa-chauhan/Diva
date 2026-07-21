@@ -153,6 +153,49 @@ export async function login(email: string, password: string): Promise<TokenRespo
   return data;
 }
 
+export async function sendOtp(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    throw new Error(errData?.detail ?? "Failed to send OTP.");
+  }
+  return res.json();
+}
+
+export async function verifyOtp(email: string, otp: string): Promise<TokenResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    throw new Error(errData?.detail ?? "Invalid or expired OTP code.");
+  }
+  const data: TokenResponse = await res.json();
+  setTokens(data.access_token, data.refresh_token);
+  return data;
+}
+
+export async function socialLogin(provider: string, token: string, displayName?: string): Promise<TokenResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/social-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, token, display_name: displayName }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    throw new Error(errData?.detail ?? "Social login failed.");
+  }
+  const data: TokenResponse = await res.json();
+  setTokens(data.access_token, data.refresh_token);
+  return data;
+}
+
 export async function fetchMe(): Promise<User> {
   const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/me`);
   if (!res.ok) throw new Error("Failed to fetch profile");
@@ -181,7 +224,7 @@ export async function createJob(referencePhotoId: string, selfie: File): Promise
 }
 
 export async function fetchJob(jobId: string): Promise<Job> {
-  const res = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`);
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/jobs/${jobId}`);
   if (!res.ok) throw new Error("Failed to check job status.");
   return res.json();
 }

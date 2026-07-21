@@ -16,12 +16,15 @@ class User(Base):
     email: Mapped[str] = mapped_column(
         String(255), unique=True, nullable=False, index=True
     )
-    
+
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     generation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     storage_used_bytes: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=0
@@ -29,6 +32,10 @@ class User(Base):
 
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    otp_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    otp_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

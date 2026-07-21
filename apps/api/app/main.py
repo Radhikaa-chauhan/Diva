@@ -1,4 +1,5 @@
 """Diva API application entry point.
+# Updated environment and auth schema settings
 
 Configures:
 - Async lifespan lifecycle for database connectivity checks, auto-migrations, and background task management
@@ -108,12 +109,21 @@ app = FastAPI(
 )
 
 # Configure CORS Middleware
-logger.info("Configuring CORS for allowed origins=%s", settings.allowed_origins_list)
+dev_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+cors_origins = list(set(settings.allowed_origins_list + dev_origins))
+logger.info("Configuring CORS for allowed origins=%s", cors_origins)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins_list,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_origins=cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
     allow_credentials=True,
 )
 
