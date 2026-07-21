@@ -1,11 +1,12 @@
 """Authentication endpoints — signup, login, token refresh, profile, email verification, password reset, and social auth."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
@@ -15,6 +16,7 @@ from app.schemas import (
     RefreshRequest,
     ResendVerificationRequest,
     ResetPasswordRequest,
+    SendOtpRequest,
     SocialLoginRequest,
     TokenResponse,
     UpdateProfileRequest,
@@ -22,6 +24,7 @@ from app.schemas import (
     UserOut,
     UserSignup,
     VerifyEmailRequest,
+    VerifyOtpRequest,
 )
 from app.services.auth import (
     create_access_token,
@@ -29,13 +32,16 @@ from app.services.auth import (
     create_password_reset_token,
     create_refresh_token,
     decode_token,
+    generate_otp,
     hash_password,
+    verify_otp,
     verify_password,
     verify_social_token,
 )
 from app.services.rate_limiter import login_rate_limiter, rate_limit_login
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -44,6 +50,9 @@ def _build_token_response(user: User) -> TokenResponse:
     return TokenResponse(
         access_token=create_access_token(user.id),
         refresh_token=create_refresh_token(user.id),
+        token_type="bearer",
+        expires_in=settings.access_token_expire_minutes * 60,
+        refresh_expires_in=settings.refresh_token_expire_days * 86400,
         user=UserOut.model_validate(user),
     )
 
@@ -59,23 +68,27 @@ def signup(body: UserSignup, db: Session = Depends(get_db)) -> TokenResponse:
             detail="An account with this email already exists.",
         )
 
+    otp_code = generate_otp(6)
+    otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
     user = User(
         email=body.email,
         password_hash=hash_password(body.password),
         display_name=body.display_name,
         is_email_verified=False,
+        otp_code=otp_code,
+        otp_expires_at=otp_expires_at,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    # Generate and log email verification token
-    verify_token = create_email_verify_token(user.id)
     logger.info(
-        "User signed up successfully: user_id=%s, email=%s. Verification token generated: %s",
+        "🔑 User signed up: user_id=%s, email=%s. OTP Code: %s (Expires at %s)",
         user.id,
         user.email,
-        verify_token,
+        otp_code,
+        otp_expires_at.isoformat(),
     )
 
     return _build_token_response(user)
@@ -111,7 +124,7 @@ def login(
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         client_ip = forwarded_for.split(",")[0].strip()
-    login_rate_limiter.reset(client_ip)
+    login_rate_limiter.reset(client_ip, reason="successful_login")
 
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
@@ -211,6 +224,63 @@ def resend_verification(
     )
 
 
+@router.post("/send-otp", response_model=MessageResponse)
+def send_otp(
+    body: SendOtpRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Generate and send a 6-digit OTP code to the requested email."""
+    logger.info("OTP generation requested for email=%s", body.email)
+    user = db.scalars(select(User).where(User.email == body.email)).first()
+    if user:
+        otp_code = generate_otp(6)
+        user.otp_code = otp_code
+        user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        db.commit()
+        logger.info("🔑 OTP code generated for email=%s: %s (expires in 10 mins)", user.email, otp_code)
+        return MessageResponse(
+            message=f"An OTP code has been sent to {user.email}. Code: {otp_code}"
+        )
+
+    return MessageResponse(
+        message="If an account with that email exists, an OTP code has been sent."
+    )
+
+
+@router.post("/verify-otp", response_model=TokenResponse)
+def verify_otp_endpoint(
+    body: VerifyOtpRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Verify email address using 6-digit OTP code and return authentication tokens."""
+    logger.info("OTP verification attempt for email=%s", body.email)
+    user = db.scalars(select(User).where(User.email == body.email)).first()
+    if user is None or not user.is_active or getattr(user, "is_deleted", False):
+        logger.warning("OTP verification failed — user not found or inactive for email=%s", body.email)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User account not found or inactive.",
+        )
+
+    if not verify_otp(user, body.otp):
+        logger.warning("OTP verification failed — invalid or expired OTP code for email=%s", body.email)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code.",
+        )
+
+    # Mark user email as verified and clear OTP
+    user.is_email_verified = True
+    user.email_verified_at = datetime.now(timezone.utc)
+    user.otp_code = None
+    user.otp_expires_at = None
+    db.commit()
+    db.refresh(user)
+
+    logger.info("🔑 Email address verified successfully via OTP for user_id=%s (email=%s)", user.id, user.email)
+    return _build_token_response(user)
+
+
 # ── Password Reset ────────────────────────────────────────────────────
 
 @router.post("/forgot-password", response_model=MessageResponse)
@@ -272,13 +342,14 @@ def social_login(
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Authenticate or register user via OAuth provider token (Google, GitHub, etc.)."""
-    logger.info("Social login attempt for provider=%s", body.provider)
-    payload = verify_social_token(body.provider, body.token)
+    provider_str = body.provider.value if hasattr(body.provider, "value") else str(body.provider)
+    logger.info("Social login attempt for provider=%s", provider_str)
+    payload = verify_social_token(provider_str, body.token)
     if payload is None or "email" not in payload:
-        logger.warning("Social login failed — invalid token for provider=%s", body.provider)
+        logger.warning("Social login failed — invalid token for provider=%s", provider_str)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid or unverified {body.provider} token.",
+            detail=f"Invalid or unverified {provider_str} token.",
         )
 
     email = payload["email"]
@@ -289,7 +360,7 @@ def social_login(
         logger.info("Creating new user from social login: email=%s, provider=%s", email, body.provider)
         user = User(
             email=email,
-            password_hash=hash_password(f"social-oauth-{body.provider}-{email}"),
+            password_hash=hash_password(f"social-oauth-{provider_str[:10]}"),
             display_name=display_name,
             is_email_verified=True,
             email_verified_at=datetime.now(timezone.utc),

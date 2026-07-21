@@ -34,7 +34,7 @@ from app.models.generation_job import GenerationJob, JobStatus
 from app.models.user import User
 from app.services import storage
 # pyrefly: ignore [missing-import]
-from app.services.image_gen import generate, GenerationError, InputValidationError
+from app.services.flux import generate, GenerationError, InputValidationError
 
 logger = logging.getLogger(__name__)
 

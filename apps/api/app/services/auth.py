@@ -24,6 +24,7 @@ New dependencies (only imported where used, so the rest of this module
 still works if they aren't installed yet): `google-auth`, `httpx`.
 """
 import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -194,22 +195,25 @@ def verify_social_token(provider: str, token: str) -> dict | None:
     settings.environment is development/test/local, so it can't quietly
     become a login bypass in production.
     """
-    logger.info("Verifying social token for provider=%s", provider)
+    provider_str = provider.value if hasattr(provider, "value") else str(provider)
+    logger.info("Verifying social token for provider=%s", provider_str)
     if not token or len(token) < 10:
         return None
 
-    if token.startswith("mock:"):
+    if token.startswith("mock:") or token.startswith("demo-") or token.startswith("dev-"):
         if getattr(settings, "environment", "production") not in _MOCK_ALLOWED_ENVIRONMENTS:
             logger.error("Rejected mock social token outside a dev/test environment")
             return None
-        parts = token.split(":")
-        if len(parts) < 2:
-            return None
-        email = parts[1]
-        display_name = parts[2] if len(parts) > 2 else email.split("@")[0]
-        return {"email": email, "display_name": display_name, "sub": f"{provider}_{email}"}
+        if token.startswith("mock:"):
+            parts = token.split(":")
+            email = parts[1] if len(parts) > 1 else f"{provider_str.lower()}_user@example.com"
+            display_name = parts[2] if len(parts) > 2 else email.split("@")[0]
+        else:
+            email = f"{provider_str.lower()}_user@example.com"
+            display_name = f"{provider_str.title()} Account"
+        return {"email": email, "display_name": display_name, "sub": f"{provider_str}_{email}"}
 
-    provider_key = provider.lower()
+    provider_key = provider_str.lower()
     try:
         if provider_key == "google":
             return _verify_google_token(token)
@@ -294,3 +298,37 @@ def _verify_github_token(token: str) -> dict | None:
 
     name = data.get("name") or data.get("login")
     return {"email": email, "display_name": name or email.split("@")[0], "sub": str(data.get("id"))}
+
+
+# ── One-Time Password (OTP) Helpers ───────────────────────────────────
+
+def generate_otp(length: int = 6) -> str:
+    """Generate a cryptographically secure numeric OTP code (default 6 digits)."""
+    digits = [secrets.choice("0123456789") for _ in range(length)]
+    return "".join(digits)
+
+
+def verify_otp(user: object, otp_code: str) -> bool:
+    """Verify that the provided OTP matches user.otp_code and has not expired."""
+    if not user or not getattr(user, "otp_code", None) or not getattr(user, "otp_expires_at", None):
+        return False
+
+    stored_code = getattr(user, "otp_code", "").strip()
+    provided_code = str(otp_code).strip()
+
+    if not secrets.compare_digest(stored_code, provided_code):
+        return False
+
+    now = datetime.now(timezone.utc)
+    expires_at = getattr(user, "otp_expires_at", None)
+    if expires_at is None:
+        return False
+
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if now > expires_at:
+        logger.warning("OTP verification failed: OTP expired for user_id=%s", getattr(user, "id", "unknown"))
+        return False
+
+    return True

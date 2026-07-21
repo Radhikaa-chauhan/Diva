@@ -186,6 +186,23 @@ def run_auto_migrations() -> None:
                     except (ProgrammingError, OperationalError) as exc:
                         logger.debug("Column token_version already exists or added concurrently: %s", exc)
 
+                if "otp_code" not in columns:
+                    logger.info("Auto-migrating users table: adding otp_code column")
+                    try:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN otp_code VARCHAR(10)"))
+                        _record_migration(conn, "v6_user_otp_code")
+                    except (ProgrammingError, OperationalError) as exc:
+                        logger.debug("Column otp_code already exists or added concurrently: %s", exc)
+
+                if "otp_expires_at" not in columns:
+                    col_type = "DATETIME" if is_sqlite else "TIMESTAMP WITH TIME ZONE"
+                    logger.info("Auto-migrating users table: adding otp_expires_at column")
+                    try:
+                        conn.execute(text(f"ALTER TABLE users ADD COLUMN otp_expires_at {col_type}"))
+                        _record_migration(conn, "v7_user_otp_expires_at")
+                    except (ProgrammingError, OperationalError) as exc:
+                        logger.debug("Column otp_expires_at already exists or added concurrently: %s", exc)
+
             # 4. Generation Jobs Table Migrations
             if "generation_jobs" in tables:
                 job_columns = {c["name"] for c in inspector.get_columns("generation_jobs")}

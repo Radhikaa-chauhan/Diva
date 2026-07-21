@@ -96,8 +96,8 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    expires_in: int  # Seconds
-    refresh_expires_in: int  # Seconds
+    expires_in: int = 3600  # Seconds (default 1 hour)
+    refresh_expires_in: int = 604800  # Seconds (default 7 days)
     user: UserOut
 
     model_config = {"from_attributes": True}
@@ -130,6 +130,19 @@ class MessageResponse(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     token: str = Field(..., min_length=10)
+
+    model_config = {"from_attributes": True}
+
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="6-digit numeric OTP code")
+
+    model_config = {"from_attributes": True}
+
+
+class SendOtpRequest(BaseModel):
+    email: EmailStr
 
     model_config = {"from_attributes": True}
 
