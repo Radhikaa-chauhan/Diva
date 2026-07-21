@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     email_token_expire_hours: int = 24
     password_reset_token_expire_minutes: int = 15
 
+    # ── Email (SMTP) ──────────────────────────────────────────────────
+    # Unset in dev = emails are logged, not sent.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    email_from: str | None = None
+
     # ── Rate Limiting ──────────────────────────────────────────────────
     login_rate_limit_requests: int = 5
     login_rate_limit_window_seconds: int = 900  # 15 minutes
