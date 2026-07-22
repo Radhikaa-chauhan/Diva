@@ -59,6 +59,7 @@ def get_profile(
         username=target.username,
         display_name=target.display_name,
         avatar_url=target.avatar_url,
+        bio=target.bio,
         followers_count=target.followers_count,
         following_count=target.following_count,
         posts_count=posts_count,

@@ -88,6 +88,7 @@ class UserOut(BaseModel):
     avatar_url: HttpUrl | None = None
     is_email_verified: bool = False
     is_admin: bool = False
+    bio: str | None = None
     generation_count: int = Field(..., ge=0)
     created_at: datetime
 
@@ -113,6 +114,7 @@ class RefreshRequest(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     display_name: str | None = Field(None, min_length=1, max_length=100)
+    bio: str | None = Field(None, max_length=300)
 
     @field_validator("display_name")
     @classmethod
@@ -120,6 +122,11 @@ class UpdateProfileRequest(BaseModel):
         if v is not None and (not v or not v.strip()):
             raise ValueError("display_name cannot be empty or whitespace-only")
         return v.strip() if v else None
+
+    @field_validator("bio")
+    @classmethod
+    def clean_bio(cls, v):
+        return v.strip() if v else v
 
     model_config = {"from_attributes": True}
 
@@ -368,6 +375,7 @@ class ProfileOut(BaseModel):
     username: str | None
     display_name: str
     avatar_url: HttpUrl | None = None
+    bio: str | None = None
     followers_count: int = Field(..., ge=0)
     following_count: int = Field(..., ge=0)
     posts_count: int = Field(..., ge=0)

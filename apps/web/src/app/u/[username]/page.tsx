@@ -9,10 +9,12 @@ import {
   followUser,
   unfollowUser,
   updateProfile,
+  uploadAvatar,
   type Post,
   type Profile,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import Avatar from "@/components/Avatar";
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
@@ -27,21 +29,37 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [followBusy, setFollowBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [draftBio, setDraftBio] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   async function saveProfile() {
     const name = draftName.trim();
     if (!name || !profile) return;
     setSavingEdit(true);
     try {
-      await updateProfile(name);
+      await updateProfile({ display_name: name, bio: draftBio.trim() || null });
       await checkAuth();
-      setProfile({ ...profile, display_name: name });
+      setProfile({ ...profile, display_name: name, bio: draftBio.trim() || null });
       setEditing(false);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  async function handleAvatarChange(file: File | null) {
+    if (!file || !profile) return;
+    setAvatarBusy(true);
+    try {
+      const updated = await uploadAvatar(file);
+      await checkAuth();
+      setProfile({ ...profile, avatar_url: updated.avatar_url });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAvatarBusy(false);
     }
   }
 
@@ -98,37 +116,28 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         <div className="h-28 rounded-2xl bg-zinc-900 animate-pulse border border-zinc-800/60" />
       ) : (
         <header className="flex items-center gap-6">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-600 text-3xl font-black text-white uppercase shadow-lg">
-            {profile.display_name[0]}
+          <div className="relative shrink-0">
+            <Avatar src={profile.avatar_url} name={profile.display_name} size={80} className="shadow-lg" />
+            {isOwnProfile && (
+              <label
+                className={`absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-xs hover:bg-zinc-800 transition ${avatarBusy ? "opacity-50" : ""}`}
+                title="Change photo"
+              >
+                {avatarBusy ? "…" : "📷"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  disabled={avatarBusy}
+                  onChange={(e) => handleAvatarChange(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            )}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              {editing ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    maxLength={100}
-                    className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none"
-                    autoFocus
-                  />
-                  <button
-                    onClick={saveProfile}
-                    disabled={savingEdit || !draftName.trim()}
-                    className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40 hover:opacity-90 transition"
-                  >
-                    {savingEdit ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    onClick={() => setEditing(false)}
-                    className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+              {!editing && (
                 <h1 className="truncate text-xl font-bold text-zinc-100">{profile.display_name}</h1>
               )}
               {profile.username && !editing && (
@@ -138,6 +147,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 <button
                   onClick={() => {
                     setDraftName(profile.display_name);
+                    setDraftBio(profile.bio ?? "");
                     setEditing(true);
                   }}
                   className="rounded-full border border-zinc-700 bg-zinc-800/80 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-zinc-300 hover:border-purple-500 hover:text-purple-300 transition"
@@ -174,6 +184,45 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 <span className="text-zinc-500">following</span>
               </span>
             </div>
+
+            {/* Bio / edit form */}
+            {editing ? (
+              <div className="mt-4 flex flex-col gap-2">
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  maxLength={100}
+                  placeholder="Display name"
+                  className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none"
+                />
+                <textarea
+                  value={draftBio}
+                  onChange={(e) => setDraftBio(e.target.value)}
+                  maxLength={300}
+                  rows={3}
+                  placeholder="Add a bio..."
+                  className="resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-purple-500 focus:outline-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveProfile}
+                    disabled={savingEdit || !draftName.trim()}
+                    className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40 hover:opacity-90 transition"
+                  >
+                    {savingEdit ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="rounded-lg border border-zinc-800 px-4 py-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              profile.bio && <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-300">{profile.bio}</p>
+            )}
           </div>
         </header>
       )}

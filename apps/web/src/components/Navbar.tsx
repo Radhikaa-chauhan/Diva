@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useState } from "react";
+import Avatar from "@/components/Avatar";
 
 export default function Navbar() {
   const { user, logout, isLoggedIn } = useAuth();
@@ -54,9 +55,7 @@ export default function Navbar() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-800/80 px-3 py-1.5 text-sm hover:border-purple-500 hover:bg-zinc-800 transition"
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-600 text-xs font-bold text-white uppercase shadow-sm">
-                  {user.display_name[0]}
-                </div>
+                <Avatar src={user.avatar_url} name={user.display_name} size={24} className="shadow-sm" />
                 <span className="max-w-[100px] truncate text-zinc-200">
                   {user.display_name}
                 </span>

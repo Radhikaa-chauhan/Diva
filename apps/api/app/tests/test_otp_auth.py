@@ -56,6 +56,7 @@ class TestOTPAuthentication(unittest.TestCase):
         user.username = "testuser"
         user.display_name = "Test User"
         user.avatar_url = None
+        user.bio = None
         user.generation_count = 0
         user.created_at = datetime.now(timezone.utc)
 

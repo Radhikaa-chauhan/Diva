@@ -1,4 +1,5 @@
 "use client";
+import Avatar from "@/components/Avatar";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -54,9 +55,7 @@ export default function PostCard({ post }: { post: Post }) {
     <article className="glass overflow-hidden rounded-2xl border border-zinc-800/80">
       {/* Author header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-600 text-xs font-bold text-white uppercase">
-          {post.author.display_name[0]}
-        </div>
+        <Avatar src={post.author.avatar_url} name={post.author.display_name} size={32} />
         <div className="min-w-0">
           {profileHref ? (
             <Link href={profileHref} className="block truncate text-sm font-semibold text-zinc-200 hover:text-purple-400 transition">
