@@ -206,7 +206,7 @@ function LoginForm() {
               </div>
               <input
                 type="password"
-                required={mode !== "otp"}
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
