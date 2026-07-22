@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import Base, check_db_connection, engine, run_auto_migrations
-from app.routers import auth, dashboard, health, jobs, references
+from app.routers import auth, dashboard, health, jobs, posts, references
 from app.services.rate_limiter import cleanup_rate_limiters
 from app.services.stats_cache import stats_cache
 
@@ -140,6 +140,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(references.router)
 app.include_router(jobs.router)
+app.include_router(posts.router)
 app.include_router(dashboard.router)
 
 logger.info("Diva API v1.0.0 configured — all routers mounted")
