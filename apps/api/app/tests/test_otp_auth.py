@@ -53,6 +53,7 @@ class TestOTPAuthentication(unittest.TestCase):
         user.otp_code = "654321"
         user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         # UserOut.model_validate needs real field types, not MagicMocks
+        user.username = "testuser"
         user.display_name = "Test User"
         user.avatar_url = None
         user.generation_count = 0
