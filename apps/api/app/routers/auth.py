@@ -38,6 +38,7 @@ from app.services.auth import (
     verify_password,
     verify_social_token,
 )
+from app.deps import is_admin
 from app.services.email import send_email
 from app.services.rate_limiter import login_rate_limiter, rate_limit_login
 
@@ -57,6 +58,12 @@ def _unique_username(db: Session, email: str) -> str:
     return candidate
 
 
+def _user_out(user: User) -> UserOut:
+    out = UserOut.model_validate(user)
+    out.is_admin = is_admin(user)
+    return out
+
+
 def _build_token_response(user: User) -> TokenResponse:
     return TokenResponse(
         access_token=create_access_token(user.id),
@@ -64,7 +71,7 @@ def _build_token_response(user: User) -> TokenResponse:
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
         refresh_expires_in=settings.refresh_token_expire_days * 86400,
-        user=UserOut.model_validate(user),
+        user=_user_out(user),
     )
 
 
@@ -167,7 +174,7 @@ def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)) -> TokenR
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
     logger.debug("Profile fetched for user_id=%s", current_user.id)
-    return UserOut.model_validate(current_user)
+    return _user_out(current_user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -181,7 +188,7 @@ def update_me(
         current_user.display_name = body.display_name
     db.commit()
     db.refresh(current_user)
-    return UserOut.model_validate(current_user)
+    return _user_out(current_user)
 
 
 # ── Email Verification ────────────────────────────────────────────────

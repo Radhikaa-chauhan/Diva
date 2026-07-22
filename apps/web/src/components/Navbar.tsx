@@ -87,6 +87,15 @@ export default function Navbar() {
                     >
                       My Dashboard
                     </Link>
+                    {user.is_admin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex w-full items-center px-3 py-2 text-sm text-amber-300 hover:bg-amber-900/20 hover:text-amber-200 rounded-md transition"
+                      >
+                        Admin Dashboard
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         setDropdownOpen(false);

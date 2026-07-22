@@ -21,6 +21,7 @@ export type User = {
   username: string | null;
   display_name: string;
   avatar_url: string | null;
+  is_admin: boolean;
   generation_count: number;
   created_at: string;
 };
@@ -443,4 +444,38 @@ export async function searchUsers(q: string, page = 1): Promise<PaginatedRespons
 
 export async function searchPosts(q: string, page = 1): Promise<PaginatedResponse<Post>> {
   return requestJson(`${API_BASE_URL}/api/search/posts?q=${encodeURIComponent(q)}&page=${page}`, {}, "Search failed.");
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────
+
+export type AdminStats = {
+  total_users: number;
+  active_24h: number;
+  active_7d: number;
+  new_users_7d: number;
+  verified_users: number;
+  total_generations: number;
+  total_posts: number;
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  username: string | null;
+  display_name: string;
+  is_email_verified: boolean;
+  is_active: boolean;
+  generation_count: number;
+  followers_count: number;
+  last_login_at: string | null;
+  created_at: string;
+};
+
+export async function fetchAdminStats(): Promise<AdminStats> {
+  return requestJson(`${API_BASE_URL}/api/admin/stats`, {}, "Failed to load stats.");
+}
+
+export async function fetchAdminUsers(page = 1, q = ""): Promise<PaginatedResponse<AdminUser>> {
+  const qp = q ? `&q=${encodeURIComponent(q)}` : "";
+  return requestJson(`${API_BASE_URL}/api/admin/users?page=${page}${qp}`, {}, "Failed to load users.");
 }
