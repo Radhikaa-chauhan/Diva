@@ -318,3 +318,14 @@ class PostOut(BaseModel):
 
 class PaginatedPosts(PaginatedResponse[PostOut]):
     pass
+
+
+# ── Social: Follow ────────────────────────────────────────────────────
+
+class FollowStatusOut(BaseModel):
+    is_following: bool
+    followers_count: int = Field(..., ge=0)
+
+
+class PaginatedUsers(PaginatedResponse[AuthorSummary]):
+    pass
