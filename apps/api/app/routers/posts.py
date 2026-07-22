@@ -19,15 +19,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
 
-def _to_post_out(post: Post, viewer: User | None, db: Session) -> PostOut:
-    is_liked = False
-    is_saved = False
-    if viewer:
-        from app.models.social import Like, SavedPost
-
-        is_liked = db.get(Like, (viewer.id, post.id)) is not None
-        is_saved = db.get(SavedPost, (viewer.id, post.id)) is not None
-
+def build_post_out(post: Post, is_liked: bool, is_saved: bool) -> PostOut:
+    """Shared Post -> PostOut mapping. Bulk listings (feed/explore) hydrate
+    is_liked/is_saved themselves in one query; this just assembles the schema."""
     return PostOut(
         id=post.id,
         author=post.author,
@@ -42,6 +36,20 @@ def _to_post_out(post: Post, viewer: User | None, db: Session) -> PostOut:
         is_saved=is_saved,
         created_at=post.created_at,
     )
+
+
+def _to_post_out(post: Post, viewer: User | None, db: Session) -> PostOut:
+    """Single-post lookup (get/create) — two point queries are fine here;
+    it's one post, not a list."""
+    is_liked = False
+    is_saved = False
+    if viewer:
+        from app.models.social import Like, SavedPost
+
+        is_liked = db.get(Like, (viewer.id, post.id)) is not None
+        is_saved = db.get(SavedPost, (viewer.id, post.id)) is not None
+
+    return build_post_out(post, is_liked, is_saved)
 
 
 @router.post("", response_model=PostOut, status_code=201)
