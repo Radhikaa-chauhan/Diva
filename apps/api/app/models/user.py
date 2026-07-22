@@ -26,6 +26,8 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     generation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    followers_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    following_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     storage_used_bytes: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=0
     )

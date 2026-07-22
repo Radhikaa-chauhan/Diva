@@ -192,6 +192,15 @@ def run_auto_migrations() -> None:
                     except (ProgrammingError, OperationalError) as exc:
                         logger.debug("Column otp_code already exists or added concurrently: %s", exc)
 
+                for col in ("followers_count", "following_count"):
+                    if col not in columns:
+                        logger.info("Auto-migrating users table: adding %s column", col)
+                        try:
+                            conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"))
+                            _record_migration(conn, f"v8_user_{col}")
+                        except (ProgrammingError, OperationalError) as exc:
+                            logger.debug("Column %s already exists or added concurrently: %s", col, exc)
+
                 if "otp_expires_at" not in columns:
                     col_type = "DATETIME" if is_sqlite else "TIMESTAMP WITH TIME ZONE"
                     logger.info("Auto-migrating users table: adding otp_expires_at column")
