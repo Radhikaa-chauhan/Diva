@@ -120,6 +120,26 @@ def get_current_user_optional(
         return None
 
 
+def is_admin(user: User) -> bool:
+    """An admin is any user whose email is listed in ADMIN_EMAILS."""
+    from app.config import get_settings
+
+    return user.email.lower() in get_settings().admin_emails_list
+
+
+def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Gate admin-only routes. 403 for authenticated non-admins."""
+    if not is_admin(current_user):
+        logger.warning("Admin access denied for user_id=%s", current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    return current_user
+
+
 def require_verified_user(
     current_user: User = Depends(get_current_user),
 ) -> User:

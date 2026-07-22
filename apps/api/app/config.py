@@ -71,6 +71,15 @@ class Settings(BaseSettings):
     # Unset = Google login is disabled (clean 401, not a crash).
     google_client_id: str | None = None
 
+    # ── Admin ─────────────────────────────────────────────────────────
+    # Comma-separated emails granted admin access (dashboard, curation).
+    # Bootstraps the first admin without a DB column or manual SQL.
+    admin_emails: str = ""
+
+    @property
+    def admin_emails_list(self) -> list[str]:
+        return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
+
     # ── Email (SMTP) ──────────────────────────────────────────────────
     # Unset in dev = emails are logged, not sent.
     smtp_host: str | None = None

@@ -87,6 +87,7 @@ class UserOut(BaseModel):
     display_name: str
     avatar_url: HttpUrl | None = None
     is_email_verified: bool = False
+    is_admin: bool = False
     generation_count: int = Field(..., ge=0)
     created_at: datetime
 
@@ -331,6 +332,33 @@ class FollowStatusOut(BaseModel):
 
 class PaginatedUsers(PaginatedResponse[AuthorSummary]):
     pass
+
+
+# ── Admin ─────────────────────────────────────────────────────────────
+
+class AdminStatsOut(BaseModel):
+    total_users: int = Field(..., ge=0)
+    active_24h: int = Field(..., ge=0)     # logged in within 24h
+    active_7d: int = Field(..., ge=0)      # logged in within 7 days
+    new_users_7d: int = Field(..., ge=0)   # signed up within 7 days
+    verified_users: int = Field(..., ge=0)
+    total_generations: int = Field(..., ge=0)
+    total_posts: int = Field(..., ge=0)
+
+
+class AdminUserOut(BaseModel):
+    id: str
+    email: str
+    username: str | None
+    display_name: str
+    is_email_verified: bool
+    is_active: bool
+    generation_count: int = Field(..., ge=0)
+    followers_count: int = Field(..., ge=0)
+    last_login_at: datetime | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Social: Profiles ──────────────────────────────────────────────────
