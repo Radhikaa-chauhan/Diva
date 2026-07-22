@@ -25,6 +25,7 @@ def list_posts(
     per_page: int,
     following_ids: list[str] | None = None,
     include_private_for: str | None = None,
+    caption_search: str | None = None,
 ) -> PaginatedResponse[PostOut]:
     """Post listings, newest first. Public-only, except a profile owner viewing
     their own grid (include_private_for). is_liked/is_saved are hydrated as
@@ -40,6 +41,8 @@ def list_posts(
         base = base.where(Post.visibility == "public")
     if following_ids is not None:
         base = base.where(Post.user_id.in_(following_ids))
+    if caption_search:
+        base = base.where(Post.caption.ilike(f"%{caption_search}%"))
 
     if viewer:
         is_liked_expr = exists(
