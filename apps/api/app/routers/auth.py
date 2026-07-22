@@ -47,6 +47,16 @@ settings = get_settings()
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+def _unique_username(db: Session, email: str) -> str:
+    """Derive a unique handle from the email local-part (bob@x.com -> bob, bob2, ...)."""
+    base = "".join(c for c in email.split("@")[0].lower() if c.isalnum() or c in "._")[:30] or "user"
+    candidate, n = base, 1
+    while db.scalars(select(User).where(User.username == candidate)).first() is not None:
+        n += 1
+        candidate = f"{base}{n}"
+    return candidate
+
+
 def _build_token_response(user: User) -> TokenResponse:
     return TokenResponse(
         access_token=create_access_token(user.id),
@@ -74,6 +84,7 @@ def signup(body: UserSignup, db: Session = Depends(get_db)) -> TokenResponse:
 
     user = User(
         email=body.email,
+        username=_unique_username(db, body.email),
         password_hash=hash_password(body.password),
         display_name=body.display_name,
         is_email_verified=False,
@@ -370,6 +381,7 @@ def social_login(
         logger.info("Creating new user from social login: email=%s, provider=%s", email, body.provider)
         user = User(
             email=email,
+            username=_unique_username(db, email),
             password_hash=hash_password(f"social-oauth-{provider_str[:10]}"),
             display_name=display_name,
             is_email_verified=True,
