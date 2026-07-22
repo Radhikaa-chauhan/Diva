@@ -274,3 +274,47 @@ class DashboardStatsOut(BaseModel):
         return v
 
     model_config = {"from_attributes": True}
+
+
+# ── Social: Posts ─────────────────────────────────────────────────────
+
+class AuthorSummary(BaseModel):
+    id: str
+    display_name: str
+    avatar_url: HttpUrl | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class PostCreate(BaseModel):
+    job_id: str
+    caption: str | None = Field(None, max_length=2000)
+    visibility: str = "public"
+
+    @field_validator("visibility")
+    @classmethod
+    def validate_visibility(cls, v):
+        if v not in ("public", "private"):
+            raise ValueError("visibility must be 'public' or 'private'")
+        return v
+
+
+class PostOut(BaseModel):
+    id: str
+    author: AuthorSummary
+    reference_photo_id: str | None
+    image_url: HttpUrl
+    caption: str | None
+    visibility: str
+    likes_count: int = Field(..., ge=0)
+    comments_count: int = Field(..., ge=0)
+    saves_count: int = Field(..., ge=0)
+    is_liked: bool = False
+    is_saved: bool = False
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PaginatedPosts(PaginatedResponse[PostOut]):
+    pass
