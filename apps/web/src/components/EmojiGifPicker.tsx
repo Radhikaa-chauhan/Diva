@@ -10,22 +10,20 @@ const EMOJIS = [
   "😱", "🤯", "😴", "🤔", "🙈", "💅", "👑", "🦋", "🌸", "🍿",
 ];
 
-const TENOR_KEY = process.env.NEXT_PUBLIC_TENOR_KEY;
+const GIPHY_KEY = process.env.NEXT_PUBLIC_GIPHY_KEY;
 type Tab = "emoji" | "gif" | "sticker";
-type TenorResult = { id: string; media_formats: { tinygif?: { url: string }; gif?: { url: string } } };
+type GiphyResult = { id: string; images: { fixed_width?: { url: string }; original?: { url: string } } };
 
-async function tenor(kind: "gif" | "sticker", query: string): Promise<string[]> {
-  if (!TENOR_KEY) return [];
-  const base = query.trim()
-    ? `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}`
-    : `https://tenor.googleapis.com/v2/featured?`;
-  const sticker = kind === "sticker" ? "&searchfilter=sticker" : "";
-  const url = `${base}&key=${TENOR_KEY}&client_key=diva&limit=24&media_filter=tinygif,gif${sticker}`;
+async function giphy(kind: "gif" | "sticker", query: string): Promise<string[]> {
+  if (!GIPHY_KEY) return [];
+  const endpoint = kind === "sticker" ? "stickers" : "gifs";
+  const path = query.trim() ? `search?q=${encodeURIComponent(query)}&` : "trending?";
+  const url = `https://api.giphy.com/v1/${endpoint}/${path}api_key=${GIPHY_KEY}&limit=24&rating=pg-13`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to load from Tenor");
+  if (!res.ok) throw new Error("Failed to load from GIPHY");
   const data = await res.json();
-  return (data.results as TenorResult[])
-    .map((r) => r.media_formats.gif?.url ?? r.media_formats.tinygif?.url)
+  return (data.data as GiphyResult[])
+    .map((r) => r.images.fixed_width?.url ?? r.images.original?.url)
     .filter((u): u is string => Boolean(u));
 }
 
@@ -45,11 +43,11 @@ export default function EmojiGifPicker({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (tab === "emoji" || !TENOR_KEY) return;
+    if (tab === "emoji" || !GIPHY_KEY) return;
     setLoading(true);
     setError(null);
     const timer = setTimeout(() => {
-      tenor(tab, query)
+      giphy(tab, query)
         .then(setGifs)
         .catch((e: Error) => setError(e.message))
         .finally(() => setLoading(false));
@@ -88,9 +86,9 @@ export default function EmojiGifPicker({
             </button>
           ))}
         </div>
-      ) : !TENOR_KEY ? (
+      ) : !GIPHY_KEY ? (
         <p className="p-3 text-center text-xs text-zinc-500">
-          Set <code className="text-purple-400">NEXT_PUBLIC_TENOR_KEY</code> to enable {tab}s.
+          Set <code className="text-purple-400">NEXT_PUBLIC_GIPHY_KEY</code> to enable {tab}s.
           Emojis work without a key.
         </p>
       ) : (
