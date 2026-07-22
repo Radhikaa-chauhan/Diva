@@ -12,6 +12,16 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
+import EmojiGifPicker from "@/components/EmojiGifPicker";
+
+// A comment that is just a GIF/sticker URL renders as an image. Restricted to
+// known media hosts + .gif so arbitrary URLs can't be rendered as <img>.
+function gifUrl(text: string): string | null {
+  const t = text.trim();
+  if (!/^https?:\/\//.test(t) || /\s/.test(t)) return null;
+  const ok = /(^https:\/\/media\.tenor\.com\/)|(giphy\.com\/media\/)|(\.gif($|\?))/i.test(t);
+  return ok ? t : null;
+}
 
 export default function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,6 +32,20 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  async function sendComment(text: string) {
+    const clean = text.trim();
+    if (!clean) return;
+    try {
+      const comment = await createComment(id, clean);
+      setComments((prev) => [...prev, comment]);
+      setCommentText("");
+      setPost((p) => (p ? { ...p, comments_count: p.comments_count + 1 } : p));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   useEffect(() => {
     fetchPost(id).then(setPost).catch((err: Error) => setError(err.message));
@@ -30,19 +54,10 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault();
-    const text = commentText.trim();
-    if (!text) return;
+    if (!commentText.trim()) return;
     setSubmitting(true);
-    try {
-      const comment = await createComment(id, text);
-      setComments((prev) => [...prev, comment]);
-      setCommentText("");
-      setPost((p) => (p ? { ...p, comments_count: p.comments_count + 1 } : p));
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
+    await sendComment(commentText);
+    setSubmitting(false);
   }
 
   async function handleDelete(commentId: string) {
@@ -100,7 +115,17 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                       comment.author.display_name
                     )}
                   </p>
-                  <p className="text-sm text-zinc-400 break-words">{comment.text}</p>
+                  {gifUrl(comment.text) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={gifUrl(comment.text)!}
+                      alt="GIF comment"
+                      className="mt-1 max-w-[200px] rounded-lg border border-zinc-800"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <p className="text-sm text-zinc-400 break-words">{comment.text}</p>
+                  )}
                 </div>
                 {canDelete && (
                   <button
@@ -122,15 +147,32 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Composer */}
         {isLoggedIn ? (
-          <form onSubmit={handleComment} className="mt-5 flex gap-2">
-            <input
-              type="text"
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              maxLength={500}
-              placeholder="Add a comment..."
-              className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:border-purple-500 focus:outline-none transition"
-            />
+          <form onSubmit={handleComment} className="relative mt-5 flex gap-2">
+            <div className="relative flex flex-1 items-center rounded-xl border border-zinc-800 bg-zinc-950/50 focus-within:border-purple-500 transition">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                maxLength={500}
+                placeholder="Add a comment..."
+                className="flex-1 bg-transparent px-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setPickerOpen((o) => !o)}
+                className="px-3 text-lg text-zinc-400 hover:text-purple-400 transition"
+                aria-label="Emoji, GIFs and stickers"
+              >
+                😊
+              </button>
+              {pickerOpen && (
+                <EmojiGifPicker
+                  onEmoji={(e) => setCommentText((t) => (t + e).slice(0, 500))}
+                  onGif={(url) => sendComment(url)}
+                  onClose={() => setPickerOpen(false)}
+                />
+              )}
+            </div>
             <button
               type="submit"
               disabled={submitting || !commentText.trim()}
