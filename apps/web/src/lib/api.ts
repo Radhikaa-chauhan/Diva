@@ -18,6 +18,7 @@ export type Job = {
 export type User = {
   id: string;
   email: string;
+  username: string | null;
   display_name: string;
   avatar_url: string | null;
   generation_count: number;
@@ -266,4 +267,180 @@ export async function deleteGeneration(jobId: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete generation.");
+}
+
+// ── Social types ──────────────────────────────────────────────────────
+
+export type AuthorSummary = {
+  id: string;
+  username: string | null;
+  display_name: string;
+  avatar_url: string | null;
+};
+
+export type Post = {
+  id: string;
+  author: AuthorSummary;
+  reference_photo_id: string | null;
+  image_url: string;
+  caption: string | null;
+  visibility: "public" | "private";
+  likes_count: number;
+  comments_count: number;
+  saves_count: number;
+  is_liked: boolean;
+  is_saved: boolean;
+  created_at: string;
+};
+
+export type Profile = {
+  id: string;
+  username: string | null;
+  display_name: string;
+  avatar_url: string | null;
+  followers_count: number;
+  following_count: number;
+  posts_count: number;
+  is_following: boolean;
+  created_at: string;
+};
+
+export type Comment = {
+  id: string;
+  author: AuthorSummary;
+  text: string;
+  created_at: string;
+};
+
+// ── Social helpers ────────────────────────────────────────────────────
+
+async function requestJson<T>(url: string, options: RequestInit = {}, errorMsg = "Request failed."): Promise<T> {
+  const res = await fetchWithAuth(url, options);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? errorMsg);
+  }
+  return res.json();
+}
+
+// ── Posts ─────────────────────────────────────────────────────────────
+
+export async function createPost(
+  jobId: string,
+  caption?: string,
+  visibility: "public" | "private" = "public"
+): Promise<Post> {
+  return requestJson<Post>(`${API_BASE_URL}/api/posts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: jobId, caption, visibility }),
+  }, "Failed to publish post.");
+}
+
+export async function fetchPost(postId: string): Promise<Post> {
+  return requestJson<Post>(`${API_BASE_URL}/api/posts/${postId}`, {}, "Failed to load post.");
+}
+
+export async function deletePost(postId: string): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/posts/${postId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete post.");
+}
+
+// ── Feed / Explore ────────────────────────────────────────────────────
+
+export async function fetchFeed(page = 1, perPage = 20): Promise<PaginatedResponse<Post>> {
+  return requestJson(`${API_BASE_URL}/api/feed?page=${page}&per_page=${perPage}`, {}, "Failed to load feed.");
+}
+
+export async function fetchExplore(page = 1, perPage = 20): Promise<PaginatedResponse<Post>> {
+  return requestJson(`${API_BASE_URL}/api/explore?page=${page}&per_page=${perPage}`, {}, "Failed to load explore.");
+}
+
+// ── Engagement ────────────────────────────────────────────────────────
+
+export async function likePost(postId: string): Promise<{ is_liked: boolean; likes_count: number }> {
+  return requestJson(`${API_BASE_URL}/api/posts/${postId}/like`, { method: "POST" }, "Failed to like post.");
+}
+
+export async function unlikePost(postId: string): Promise<{ is_liked: boolean; likes_count: number }> {
+  return requestJson(`${API_BASE_URL}/api/posts/${postId}/like`, { method: "DELETE" }, "Failed to unlike post.");
+}
+
+export async function savePost(postId: string): Promise<{ is_saved: boolean; saves_count: number }> {
+  return requestJson(`${API_BASE_URL}/api/posts/${postId}/save`, { method: "POST" }, "Failed to save post.");
+}
+
+export async function unsavePost(postId: string): Promise<{ is_saved: boolean; saves_count: number }> {
+  return requestJson(`${API_BASE_URL}/api/posts/${postId}/save`, { method: "DELETE" }, "Failed to unsave post.");
+}
+
+export async function fetchSavedPosts(page = 1, perPage = 20): Promise<PaginatedResponse<Post>> {
+  return requestJson(`${API_BASE_URL}/api/saved?page=${page}&per_page=${perPage}`, {}, "Failed to load saved posts.");
+}
+
+export async function fetchComments(postId: string, page = 1, perPage = 20): Promise<PaginatedResponse<Comment>> {
+  return requestJson(
+    `${API_BASE_URL}/api/posts/${postId}/comments?page=${page}&per_page=${perPage}`,
+    {},
+    "Failed to load comments."
+  );
+}
+
+export async function createComment(postId: string, text: string): Promise<Comment> {
+  return requestJson(`${API_BASE_URL}/api/posts/${postId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  }, "Failed to post comment.");
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/comments/${commentId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete comment.");
+}
+
+// ── Follow ────────────────────────────────────────────────────────────
+
+export async function followUser(userId: string): Promise<{ is_following: boolean; followers_count: number }> {
+  return requestJson(`${API_BASE_URL}/api/users/${userId}/follow`, { method: "POST" }, "Failed to follow.");
+}
+
+export async function unfollowUser(userId: string): Promise<{ is_following: boolean; followers_count: number }> {
+  return requestJson(`${API_BASE_URL}/api/users/${userId}/follow`, { method: "DELETE" }, "Failed to unfollow.");
+}
+
+export async function fetchFollowers(userId: string, page = 1): Promise<PaginatedResponse<AuthorSummary>> {
+  return requestJson(`${API_BASE_URL}/api/users/${userId}/followers?page=${page}`, {}, "Failed to load followers.");
+}
+
+export async function fetchFollowing(userId: string, page = 1): Promise<PaginatedResponse<AuthorSummary>> {
+  return requestJson(`${API_BASE_URL}/api/users/${userId}/following?page=${page}`, {}, "Failed to load following.");
+}
+
+// ── Profiles ──────────────────────────────────────────────────────────
+
+export async function fetchProfile(username: string): Promise<Profile> {
+  return requestJson(
+    `${API_BASE_URL}/api/users/by-username/${encodeURIComponent(username)}`,
+    {},
+    "Failed to load profile."
+  );
+}
+
+export async function fetchProfilePosts(username: string, page = 1, perPage = 20): Promise<PaginatedResponse<Post>> {
+  return requestJson(
+    `${API_BASE_URL}/api/users/by-username/${encodeURIComponent(username)}/posts?page=${page}&per_page=${perPage}`,
+    {},
+    "Failed to load posts."
+  );
+}
+
+// ── Search ────────────────────────────────────────────────────────────
+
+export async function searchUsers(q: string, page = 1): Promise<PaginatedResponse<AuthorSummary>> {
+  return requestJson(`${API_BASE_URL}/api/search/users?q=${encodeURIComponent(q)}&page=${page}`, {}, "Search failed.");
+}
+
+export async function searchPosts(q: string, page = 1): Promise<PaginatedResponse<Post>> {
+  return requestJson(`${API_BASE_URL}/api/search/posts?q=${encodeURIComponent(q)}&page=${page}`, {}, "Search failed.");
 }
