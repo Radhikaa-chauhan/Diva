@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
+import Avatar from "@/components/Avatar";
 import EmojiGifPicker from "@/components/EmojiGifPicker";
 
 // A comment that is just a GIF/sticker URL renders as an image. Restricted to
@@ -102,9 +103,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
               (comment.author.id === user?.id || post?.author.id === user?.id);
             return (
               <div key={comment.id} className="flex items-start gap-3">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-600 text-xs font-bold text-white uppercase">
-                  {comment.author.display_name[0]}
-                </div>
+                <Avatar src={comment.author.avatar_url} name={comment.author.display_name} size={28} />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-zinc-300">
                     {comment.author.username ? (

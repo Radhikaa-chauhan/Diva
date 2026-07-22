@@ -1,8 +1,10 @@
 """Authentication endpoints — signup, login, token refresh, profile, email verification, password reset, and social auth."""
+import io
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
+from app.services import storage
 from app.schemas import (
     ForgotPasswordRequest,
     MessageResponse,
@@ -184,10 +187,39 @@ def update_me(
     db: Session = Depends(get_db),
 ) -> UserOut:
     if body.display_name is not None:
-        logger.info("Profile updated for user_id=%s: display_name changed", current_user.id)
         current_user.display_name = body.display_name
+    # bio: sent as null clears it, omitted (unset) leaves it unchanged.
+    if "bio" in body.model_fields_set:
+        current_user.bio = body.bio
     db.commit()
     db.refresh(current_user)
+    logger.info("Profile updated for user_id=%s", current_user.id)
+    return _user_out(current_user)
+
+
+@router.post("/me/avatar", response_model=UserOut)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """Upload a profile picture. Stored under avatars/ and set as avatar_url."""
+    if (file.content_type or "").lower() not in {"image/jpeg", "image/png", "image/webp"}:
+        raise HTTPException(status_code=400, detail="Avatar must be a JPEG, PNG, or WEBP image.")
+
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Avatar too large. Maximum 5MB.")
+    try:
+        Image.open(io.BytesIO(data)).verify()
+    except Exception:
+        raise HTTPException(status_code=400, detail="File is not a valid image.")
+
+    url = storage.save_bytes("avatars", file.filename or "avatar.jpg", data)
+    current_user.avatar_url = url
+    db.commit()
+    db.refresh(current_user)
+    logger.info("Avatar updated for user_id=%s", current_user.id)
     return _user_out(current_user)
 
 

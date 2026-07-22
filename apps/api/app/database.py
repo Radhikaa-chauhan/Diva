@@ -192,6 +192,14 @@ def run_auto_migrations() -> None:
                     except (ProgrammingError, OperationalError) as exc:
                         logger.debug("Column otp_code already exists or added concurrently: %s", exc)
 
+                if "bio" not in columns:
+                    logger.info("Auto-migrating users table: adding bio column")
+                    try:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN bio VARCHAR(300)"))
+                        _record_migration(conn, "v10_user_bio")
+                    except (ProgrammingError, OperationalError) as exc:
+                        logger.debug("Column bio already exists or added concurrently: %s", exc)
+
                 if "username" not in columns:
                     logger.info("Auto-migrating users table: adding username column with backfill")
                     try:

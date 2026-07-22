@@ -21,6 +21,7 @@ export type User = {
   username: string | null;
   display_name: string;
   avatar_url: string | null;
+  bio: string | null;
   is_admin: boolean;
   generation_count: number;
   created_at: string;
@@ -204,15 +205,26 @@ export async function fetchMe(): Promise<User> {
   return res.json();
 }
 
-export async function updateProfile(displayName: string): Promise<User> {
+export async function updateProfile(fields: { display_name?: string; bio?: string | null }): Promise<User> {
   const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/me`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ display_name: displayName }),
+    body: JSON.stringify(fields),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail ?? "Failed to update profile.");
+  }
+  return res.json();
+}
+
+export async function uploadAvatar(file: File): Promise<User> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/me/avatar`, { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? "Failed to upload avatar.");
   }
   return res.json();
 }
@@ -312,6 +324,7 @@ export type Profile = {
   username: string | null;
   display_name: string;
   avatar_url: string | null;
+  bio: string | null;
   followers_count: number;
   following_count: number;
   posts_count: number;
