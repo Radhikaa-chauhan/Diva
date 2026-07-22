@@ -204,6 +204,19 @@ export async function fetchMe(): Promise<User> {
   return res.json();
 }
 
+export async function updateProfile(displayName: string): Promise<User> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/me`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name: displayName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? "Failed to update profile.");
+  }
+  return res.json();
+}
+
 export async function fetchReferences(): Promise<ReferencePhoto[]> {
   const res = await fetch(`${API_BASE_URL}/api/references`);
   if (!res.ok) throw new Error("Failed to load the reference library.");

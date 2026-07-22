@@ -8,6 +8,7 @@ import {
   fetchProfilePosts,
   followUser,
   unfollowUser,
+  updateProfile,
   type Post,
   type Profile,
 } from "@/lib/api";
@@ -15,7 +16,7 @@ import { useAuth } from "@/lib/auth";
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, checkAuth } = useAuth();
   const router = useRouter();
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -24,6 +25,25 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [pages, setPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [followBusy, setFollowBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  async function saveProfile() {
+    const name = draftName.trim();
+    if (!name || !profile) return;
+    setSavingEdit(true);
+    try {
+      await updateProfile(name);
+      await checkAuth();
+      setProfile({ ...profile, display_name: name });
+      setEditing(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   useEffect(() => {
     fetchProfile(username).then(setProfile).catch((err: Error) => setError(err.message));
@@ -84,9 +104,46 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="truncate text-xl font-bold text-zinc-100">{profile.display_name}</h1>
-              {profile.username && (
+              {editing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    maxLength={100}
+                    className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={saveProfile}
+                    disabled={savingEdit || !draftName.trim()}
+                    className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40 hover:opacity-90 transition"
+                  >
+                    {savingEdit ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <h1 className="truncate text-xl font-bold text-zinc-100">{profile.display_name}</h1>
+              )}
+              {profile.username && !editing && (
                 <span className="text-sm text-zinc-500">@{profile.username}</span>
+              )}
+              {isOwnProfile && !editing && (
+                <button
+                  onClick={() => {
+                    setDraftName(profile.display_name);
+                    setEditing(true);
+                  }}
+                  className="rounded-full border border-zinc-700 bg-zinc-800/80 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-zinc-300 hover:border-purple-500 hover:text-purple-300 transition"
+                >
+                  Edit Profile
+                </button>
               )}
               {!isOwnProfile && (
                 <button
