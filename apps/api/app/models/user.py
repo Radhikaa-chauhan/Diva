@@ -16,6 +16,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(
         String(255), unique=True, nullable=False, index=True
     )
+    # Public handle for /u/{username} profiles. Nullable only for rows that
+    # predate the migration backfill; the app always sets it at signup.
+    username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
 
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)

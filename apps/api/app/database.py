@@ -192,6 +192,29 @@ def run_auto_migrations() -> None:
                     except (ProgrammingError, OperationalError) as exc:
                         logger.debug("Column otp_code already exists or added concurrently: %s", exc)
 
+                if "username" not in columns:
+                    logger.info("Auto-migrating users table: adding username column with backfill")
+                    try:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR(50)"))
+                        # Backfill from email local-part; suffix a counter on collision.
+                        rows = conn.execute(text("SELECT id, email FROM users WHERE username IS NULL")).fetchall()
+                        taken: set[str] = set()
+                        for user_id, email in rows:
+                            base = "".join(c for c in (email or "user").split("@")[0].lower() if c.isalnum() or c in "._")[:30] or "user"
+                            candidate, n = base, 1
+                            while candidate in taken:
+                                n += 1
+                                candidate = f"{base}{n}"
+                            taken.add(candidate)
+                            conn.execute(
+                                text("UPDATE users SET username = :u WHERE id = :i"),
+                                {"u": candidate, "i": user_id},
+                            )
+                        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_users_username ON users (username)"))
+                        _record_migration(conn, "v9_user_username")
+                    except (ProgrammingError, OperationalError) as exc:
+                        logger.debug("Column username already exists or added concurrently: %s", exc)
+
                 for col in ("followers_count", "following_count"):
                     if col not in columns:
                         logger.info("Auto-migrating users table: adding %s column", col)

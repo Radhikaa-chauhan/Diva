@@ -18,16 +18,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["feed"])
 
 
-def _list_public_posts(
+def list_posts(
     db: Session,
     viewer: User | None,
     page: int,
     per_page: int,
     following_ids: list[str] | None = None,
+    include_private_for: str | None = None,
 ) -> PaginatedResponse[PostOut]:
-    """Public posts, newest first. is_liked/is_saved are hydrated as correlated
-    EXISTS subqueries in the same statement — no per-row query (no N+1)."""
-    base = select(Post).where(Post.visibility == "public", Post.is_deleted.is_(False))
+    """Post listings, newest first. Public-only, except a profile owner viewing
+    their own grid (include_private_for). is_liked/is_saved are hydrated as
+    correlated EXISTS subqueries in the same statement — no per-row query (no N+1)."""
+    from sqlalchemy import or_
+
+    base = select(Post).where(Post.is_deleted.is_(False))
+    if include_private_for:
+        base = base.where(
+            or_(Post.visibility == "public", Post.user_id == include_private_for)
+        )
+    else:
+        base = base.where(Post.visibility == "public")
     if following_ids is not None:
         base = base.where(Post.user_id.in_(following_ids))
 
@@ -75,8 +85,8 @@ def get_feed(
         db.scalars(select(Follow.following_id).where(Follow.follower_id == current_user.id)).all()
     )
     if not following_ids:
-        return _list_public_posts(db, current_user, page, per_page)
-    return _list_public_posts(db, current_user, page, per_page, following_ids=following_ids)
+        return list_posts(db, current_user, page, per_page)
+    return list_posts(db, current_user, page, per_page, following_ids=following_ids)
 
 
 @router.get("/api/explore", response_model=PaginatedResponse[PostOut])
@@ -87,4 +97,4 @@ def get_explore(
     db: Session = Depends(get_db),
 ) -> PaginatedResponse[PostOut]:
     """All public posts, newest first. Works with or without auth."""
-    return _list_public_posts(db, current_user, page, per_page)
+    return list_posts(db, current_user, page, per_page)
