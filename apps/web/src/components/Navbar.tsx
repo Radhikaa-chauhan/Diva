@@ -33,6 +33,12 @@ export default function Navbar() {
           >
             Feed
           </Link>
+          <Link
+            href="/explore"
+            className="text-sm font-medium text-zinc-300 hover:text-purple-400 transition"
+          >
+            Explore
+          </Link>
           {isLoggedIn && (
             <Link
               href="/dashboard"
