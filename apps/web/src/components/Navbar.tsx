@@ -80,6 +80,15 @@ export default function Navbar() {
                     <div className="px-3 py-2 text-xs border-b border-zinc-800/60 mb-1 text-zinc-400 truncate">
                       {user.email}
                     </div>
+                    {user.username && (
+                      <Link
+                        href={`/u/${user.username}`}
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex w-full items-center px-3 py-2 text-sm text-zinc-300 hover:bg-purple-900/30 hover:text-purple-400 rounded-md transition"
+                      >
+                        My Profile
+                      </Link>
+                    )}
                     <Link
                       href="/dashboard"
                       onClick={() => setDropdownOpen(false)}
