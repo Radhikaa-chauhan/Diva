@@ -38,6 +38,17 @@ def build_post_out(post: Post, is_liked: bool, is_saved: bool) -> PostOut:
     )
 
 
+def get_visible_post(post_id: str, viewer: User | None, db: Session) -> Post:
+    """Fetch a post, enforcing visibility: public to anyone, private to its owner only."""
+    post = db.get(Post, post_id)
+    if post is None or post.is_deleted:
+        raise HTTPException(status_code=404, detail="Post not found")
+    is_owner = viewer is not None and post.user_id == viewer.id
+    if post.visibility == "private" and not is_owner:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
+
 def _to_post_out(post: Post, viewer: User | None, db: Session) -> PostOut:
     """Single-post lookup (get/create) — two point queries are fine here;
     it's one post, not a list."""
@@ -93,14 +104,7 @@ def get_post(
     current_user: User | None = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ) -> PostOut:
-    post = db.get(Post, post_id)
-    if post is None or post.is_deleted:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    is_owner = current_user is not None and post.user_id == current_user.id
-    if post.visibility == "private" and not is_owner:
-        raise HTTPException(status_code=404, detail="Post not found")
-
+    post = get_visible_post(post_id, current_user, db)
     return _to_post_out(post, current_user, db)
 
 
