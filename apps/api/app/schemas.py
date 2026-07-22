@@ -329,3 +329,32 @@ class FollowStatusOut(BaseModel):
 
 class PaginatedUsers(PaginatedResponse[AuthorSummary]):
     pass
+
+
+# ── Social: Engagement (likes, comments, saves) ────────────────────────
+
+class LikeStatusOut(BaseModel):
+    is_liked: bool
+    likes_count: int = Field(..., ge=0)
+
+
+class SaveStatusOut(BaseModel):
+    is_saved: bool
+    saves_count: int = Field(..., ge=0)
+
+
+class CommentCreate(BaseModel):
+    text: str = Field(..., min_length=1, max_length=500)
+
+
+class CommentOut(BaseModel):
+    id: str
+    author: AuthorSummary
+    text: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PaginatedComments(PaginatedResponse[CommentOut]):
+    pass
