@@ -43,31 +43,51 @@ _jobs_created_count = 0
 _jobs_failed_count = 0
 
 
-def _check_rate_limit(user: User, db: Session) -> None:
-    """Enforce per-user hourly rate limit."""
-    from app.config import get_settings
-
-    settings = get_settings()
-    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
-    count = db.scalar(
+def _count_generations_since(db: Session, user_id: str, since: datetime) -> int:
+    return db.scalar(
         select(func.count())
         .select_from(GenerationJob)
         .where(
-            GenerationJob.user_id == user.id,
-            GenerationJob.created_at >= one_hour_ago,
+            GenerationJob.user_id == user_id,
+            GenerationJob.created_at >= since,
             GenerationJob.is_deleted == False,  # Exclude soft-deleted jobs
         )
-    )
-    if (count or 0) >= settings.rate_limit_per_hour:
+    ) or 0
+
+
+def _check_rate_limit(user: User, db: Session) -> None:
+    """Enforce the per-user daily generation cap and a burst hourly cap."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    now = datetime.now(timezone.utc)
+
+    # Daily cap (resets at UTC midnight) — the user-facing "3 per day" limit.
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    daily = _count_generations_since(db, user.id, start_of_day)
+    if daily >= settings.daily_generation_limit:
         logger.warning(
-            "Rate limit exceeded for user_id=%s (count=%s, limit=%s)",
-            user.id,
-            count,
-            settings.rate_limit_per_hour,
+            "Daily limit reached for user_id=%s (count=%s, limit=%s)",
+            user.id, daily, settings.daily_generation_limit,
         )
         raise HTTPException(
             status_code=429,
-            detail=f"Rate limit exceeded. Maximum {settings.rate_limit_per_hour} generations per hour.",
+            detail=(
+                f"Daily limit reached. You can create {settings.daily_generation_limit} "
+                "images per day — try again after midnight UTC."
+            ),
+        )
+
+    # Hourly burst cap (secondary guard).
+    hourly = _count_generations_since(db, user.id, now - timedelta(hours=1))
+    if hourly >= settings.rate_limit_per_hour:
+        logger.warning(
+            "Hourly rate limit exceeded for user_id=%s (count=%s, limit=%s)",
+            user.id, hourly, settings.rate_limit_per_hour,
+        )
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests. Maximum {settings.rate_limit_per_hour} generations per hour.",
         )
 
 

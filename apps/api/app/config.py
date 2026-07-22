@@ -92,6 +92,7 @@ class Settings(BaseSettings):
     login_rate_limit_requests: int = 5
     login_rate_limit_window_seconds: int = 900  # 15 minutes
     rate_limit_per_hour: int = 20  # Maximum image generation jobs per user per hour
+    daily_generation_limit: int = 3  # Maximum image generations per user per day (UTC)
 
     # ── Image Generation ──────────────────────────────────────────────
     # Hugging Face Inference Providers credentials (Primary).
@@ -150,6 +151,9 @@ def get_settings() -> Settings:
 
     if settings.rate_limit_per_hour <= 0:
         raise ValueError("rate_limit_per_hour must be > 0")
+
+    if settings.daily_generation_limit <= 0:
+        raise ValueError("daily_generation_limit must be > 0")
 
     # 4. Hugging Face Credentials & Model Format Validation
     if not settings.huggingface_api_key or settings.huggingface_api_key == "change-me":
