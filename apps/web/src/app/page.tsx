@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import StyleCard from "@/components/StyleCard";
 import UploadZone from "@/components/UploadZone";
+import PublishDialog from "@/components/PublishDialog";
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   pending: "Securing your spot in the generation queue...",
@@ -43,6 +44,7 @@ export default function Home() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("All");
+  const [showPublish, setShowPublish] = useState(false);
 
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -127,6 +129,7 @@ export default function Home() {
     setJobId(null);
     setJob(null);
     setSubmitError(null);
+    setShowPublish(false);
   }
 
   const collections = ["All", ...Array.from(new Set(references?.map(r => r.collection).filter(Boolean) as string[]))];
@@ -363,12 +366,22 @@ export default function Home() {
                     </a>
                   ))}
                   <button
+                    onClick={() => setShowPublish(true)}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-purple-700/60 bg-purple-900/30 px-6 py-3 text-sm font-bold tracking-wider text-purple-300 hover:bg-purple-900/50 transition uppercase"
+                  >
+                    Share to Feed
+                  </button>
+                  <button
                     onClick={reset}
                     className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-6 py-3 text-sm font-semibold tracking-wide text-zinc-300 hover:bg-zinc-900/80 transition"
                   >
                     Start New Image
                   </button>
                 </div>
+
+                {showPublish && jobId && (
+                  <PublishDialog jobId={jobId} onClose={() => setShowPublish(false)} />
+                )}
               </div>
             )}
           </div>
