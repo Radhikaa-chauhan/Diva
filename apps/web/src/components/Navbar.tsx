@@ -27,6 +27,12 @@ export default function Navbar() {
           >
             Create
           </Link>
+          <Link
+            href="/feed"
+            className="text-sm font-medium text-zinc-300 hover:text-purple-400 transition"
+          >
+            Feed
+          </Link>
           {isLoggedIn && (
             <Link
               href="/dashboard"

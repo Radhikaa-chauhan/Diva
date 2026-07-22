@@ -48,7 +48,15 @@ export default function Home() {
 
   useEffect(() => {
     fetchReferences()
-      .then(setReferences)
+      .then((refs) => {
+        setReferences(refs);
+        // Deep link from a post's "Use this style" button: /?ref=<id>
+        const refId = new URLSearchParams(window.location.search).get("ref");
+        if (refId) {
+          const match = refs.find((r) => r.id === refId);
+          if (match) setSelected(match);
+        }
+      })
       .catch((err: Error) => setLoadError(err.message));
   }, []);
 
