@@ -83,6 +83,7 @@ class UserLogin(BaseModel):
 class UserOut(BaseModel):
     id: str
     email: str
+    username: str | None = None
     display_name: str
     avatar_url: HttpUrl | None = None
     is_email_verified: bool = False
@@ -280,6 +281,7 @@ class DashboardStatsOut(BaseModel):
 
 class AuthorSummary(BaseModel):
     id: str
+    username: str | None = None
     display_name: str
     avatar_url: HttpUrl | None = None
 
@@ -329,6 +331,22 @@ class FollowStatusOut(BaseModel):
 
 class PaginatedUsers(PaginatedResponse[AuthorSummary]):
     pass
+
+
+# ── Social: Profiles ──────────────────────────────────────────────────
+
+class ProfileOut(BaseModel):
+    id: str
+    username: str | None
+    display_name: str
+    avatar_url: HttpUrl | None = None
+    followers_count: int = Field(..., ge=0)
+    following_count: int = Field(..., ge=0)
+    posts_count: int = Field(..., ge=0)
+    is_following: bool = False
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Social: Engagement (likes, comments, saves) ────────────────────────
