@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import ShareDialog from "@/components/ShareDialog";
 
 export default function PostCard({ post }: { post: Post }) {
   const { isLoggedIn } = useAuth();
@@ -20,6 +21,7 @@ export default function PostCard({ post }: { post: Post }) {
   const [isLiked, setIsLiked] = useState(post.is_liked);
   const [likesCount, setLikesCount] = useState(post.likes_count);
   const [isSaved, setIsSaved] = useState(post.is_saved);
+  const [sharing, setSharing] = useState(false);
 
   async function toggleLike() {
     if (!isLoggedIn) return router.push("/login");
@@ -109,8 +111,18 @@ export default function PostCard({ post }: { post: Post }) {
         </Link>
 
         <button
+          onClick={() => (isLoggedIn ? setSharing(true) : router.push("/login"))}
+          className="ml-auto text-zinc-400 hover:text-purple-400 transition"
+          aria-label="Share with friends"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        </button>
+
+        <button
           onClick={toggleSave}
-          className={`ml-auto transition ${isSaved ? "text-amber-400" : "text-zinc-400 hover:text-amber-300"}`}
+          className={`transition ${isSaved ? "text-amber-400" : "text-zinc-400 hover:text-amber-300"}`}
           aria-label={isSaved ? "Unsave" : "Save"}
         >
           <svg className="h-5 w-5" fill={isSaved ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
@@ -118,6 +130,8 @@ export default function PostCard({ post }: { post: Post }) {
           </svg>
         </button>
       </div>
+
+      {sharing && <ShareDialog postId={post.id} onClose={() => setSharing(false)} />}
 
       {/* Caption + use-this-style */}
       <div className="px-4 pb-4 pt-2">

@@ -2,12 +2,26 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
+import { fetchUnreadShareCount } from "@/lib/api";
 
 export default function Navbar() {
   const { user, logout, isLoggedIn } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setUnread(0);
+      return;
+    }
+    const load = () => fetchUnreadShareCount().then(setUnread).catch(() => {});
+    load();
+    // ponytail: poll every 60s; swap for websockets/SSE if realtime matters.
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, [isLoggedIn]);
 
   return (
     <nav className="glass sticky top-0 z-50 w-full px-6 py-4 shadow-sm backdrop-blur-md">
@@ -40,6 +54,19 @@ export default function Navbar() {
           >
             Explore
           </Link>
+          {isLoggedIn && (
+            <Link
+              href="/shares"
+              className="relative text-sm font-medium text-zinc-300 hover:text-purple-400 transition"
+            >
+              Shared
+              {unread > 0 && (
+                <span className="absolute -right-3 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-pink-600 px-1 text-[10px] font-bold text-white">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </Link>
+          )}
           {isLoggedIn && (
             <Link
               href="/dashboard"

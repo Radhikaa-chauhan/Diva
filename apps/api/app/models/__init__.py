@@ -1,6 +1,6 @@
 from app.models.generation_job import GenerationJob
 from app.models.reference_photo import ReferencePhoto
-from app.models.social import Comment, Follow, Like, Post, PostVisibility, SavedPost
+from app.models.social import Comment, Follow, Like, Post, PostShare, PostVisibility, SavedPost
 from app.models.user import User
 
 __all__ = [
@@ -13,4 +13,5 @@ __all__ = [
     "Like",
     "Comment",
     "SavedPost",
+    "PostShare",
 ]

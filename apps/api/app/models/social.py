@@ -107,3 +107,23 @@ class SavedPost(Base):
     )
     post_id: Mapped[str] = mapped_column(String(36), ForeignKey("posts.id"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PostShare(Base):
+    """A post sent directly from one user to a followed user (DM-style share)."""
+    __tablename__ = "post_shares"
+    __table_args__ = (
+        # One row per (sender, recipient, post) — re-sharing the same post is a no-op.
+        Index("ux_share_from_to_post", "from_user_id", "to_user_id", "post_id", unique=True),
+        Index("idx_shares_recipient_created", "to_user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    post_id: Mapped[str] = mapped_column(String(36), ForeignKey("posts.id"), nullable=False)
+    from_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    to_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    sender = relationship("User", foreign_keys=[from_user_id], lazy="joined")
+    post = relationship("Post", lazy="joined")
