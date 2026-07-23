@@ -247,9 +247,12 @@ async def run_job(job_id: str, selfie_bytes: bytes | None = None) -> None:
             job.cost_usd = result.cost_usd
             job.status = JobStatus.COMPLETE
 
-            # Best-effort storage telemetry (local files only).
+            # Storage telemetry. Use the byte lengths we already have in memory —
+            # storage.get_file_size() only measures local /storage/ paths and
+            # returns 0 for S3 URLs, which left storage_used_bytes stuck at a
+            # constant (dashboard bug).
             try:
-                total = storage.get_file_size(job.selfie_image_url) + storage.get_file_size(result_url)
+                total = len(selfie_bytes or b"") + len(result.image_bytes)
                 if total:
                     db.execute(
                         text("UPDATE users SET storage_used_bytes = storage_used_bytes + :size WHERE id = :uid"),
