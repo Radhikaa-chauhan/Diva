@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     # Bootstraps the first admin without a DB column or manual SQL.
     admin_emails: str = ""
 
+    # ── Curation (admin auto-prompt) ──────────────────────────────────
+    # Google AI Studio key (free) for the "auto-write prompt from image"
+    # button. Unset = the manual prompt field still works.
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash"
+
     @property
     def admin_emails_list(self) -> list[str]:
         return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
