@@ -67,7 +67,12 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <h1 className="mb-6 text-xl font-bold tracking-wide text-zinc-100">Admin Dashboard</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-wide text-zinc-100">Admin Dashboard</h1>
+        <Link href="/admin/references" className="rounded-full border border-purple-800/50 bg-purple-900/30 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-purple-300 hover:bg-purple-900/50 transition">
+          Manage References
+        </Link>
+      </div>
 
       {error && (
         <p className="mb-4 rounded-xl border border-red-900/50 bg-red-950/20 p-4 text-sm text-red-400">{error}</p>

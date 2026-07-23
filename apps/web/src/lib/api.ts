@@ -536,3 +536,58 @@ export async function fetchAdminUsers(page = 1, q = ""): Promise<PaginatedRespon
   const qp = q ? `&q=${encodeURIComponent(q)}` : "";
   return requestJson(`${API_BASE_URL}/api/admin/users?page=${page}${qp}`, {}, "Failed to load users.");
 }
+
+// ── Admin: references ─────────────────────────────────────────────────
+
+export type AdminReference = {
+  id: string;
+  title: string;
+  collection: string | null;
+  thumbnail_url: string;
+  prompt_template: string;
+  active: boolean;
+  created_at: string;
+};
+
+export async function fetchAdminReferences(): Promise<AdminReference[]> {
+  return requestJson(`${API_BASE_URL}/api/admin/references`, {}, "Failed to load references.");
+}
+
+export async function draftReferencePrompt(image: File): Promise<{ style_description: Record<string, unknown>; prompt_template: string }> {
+  const form = new FormData();
+  form.append("image", image);
+  return requestJson(`${API_BASE_URL}/api/admin/references/draft-prompt`, { method: "POST", body: form }, "Auto-write failed.");
+}
+
+export async function createReference(fields: {
+  image: File;
+  title: string;
+  prompt_template: string;
+  collection?: string;
+}): Promise<AdminReference> {
+  const form = new FormData();
+  form.append("image", fields.image);
+  form.append("title", fields.title);
+  form.append("prompt_template", fields.prompt_template);
+  if (fields.collection) form.append("collection", fields.collection);
+  return requestJson(`${API_BASE_URL}/api/admin/references`, { method: "POST", body: form }, "Failed to create reference.");
+}
+
+export async function updateReference(
+  id: string,
+  fields: { active?: boolean; title?: string; collection?: string; prompt_template?: string }
+): Promise<AdminReference> {
+  return requestJson(`${API_BASE_URL}/api/admin/references/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  }, "Failed to update reference.");
+}
+
+export async function deleteReference(id: string): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/admin/references/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? "Failed to delete reference.");
+  }
+}

@@ -353,6 +353,30 @@ class AdminStatsOut(BaseModel):
     total_posts: int = Field(..., ge=0)
 
 
+class ReferenceAdminOut(BaseModel):
+    id: str
+    title: str
+    collection: str | None
+    thumbnail_url: HttpUrl
+    prompt_template: str
+    active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReferenceUpdate(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=200)
+    collection: str | None = Field(None, max_length=100)
+    prompt_template: str | None = Field(None, min_length=1, max_length=2000)
+    active: bool | None = None
+
+
+class DraftPromptOut(BaseModel):
+    style_description: dict
+    prompt_template: str
+
+
 class AdminUserOut(BaseModel):
     id: str
     email: str
