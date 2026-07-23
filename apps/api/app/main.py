@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import Base, check_db_connection, engine, run_auto_migrations
-from app.routers import admin, auth, dashboard, engagement, feed, health, jobs, posts, references, search, users
+from app.routers import admin, auth, dashboard, engagement, feed, health, jobs, posts, references, search, shares, users
 from app.services.rate_limiter import cleanup_rate_limiters
 from app.services.stats_cache import stats_cache
 
@@ -145,6 +145,7 @@ app.include_router(users.router)
 app.include_router(feed.router)
 app.include_router(engagement.router)
 app.include_router(search.router)
+app.include_router(shares.router)
 app.include_router(admin.router)
 app.include_router(dashboard.router)
 

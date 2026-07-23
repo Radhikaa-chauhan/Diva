@@ -385,6 +385,28 @@ class ProfileOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Social: Share to friends ──────────────────────────────────────────
+
+class ShareCreate(BaseModel):
+    user_ids: list[str] = Field(..., min_length=1, max_length=50)
+
+
+class ShareResultOut(BaseModel):
+    shared_with: int = Field(..., ge=0)  # how many recipients received it
+
+
+class SharedPostOut(BaseModel):
+    share_id: str
+    sender: AuthorSummary
+    post: PostOut
+    is_read: bool
+    created_at: datetime
+
+
+class UnreadCountOut(BaseModel):
+    count: int = Field(..., ge=0)
+
+
 # ── Social: Engagement (likes, comments, saves) ────────────────────────
 
 class LikeStatusOut(BaseModel):

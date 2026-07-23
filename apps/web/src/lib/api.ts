@@ -472,6 +472,37 @@ export async function searchPosts(q: string, page = 1): Promise<PaginatedRespons
   return requestJson(`${API_BASE_URL}/api/search/posts?q=${encodeURIComponent(q)}&page=${page}`, {}, "Search failed.");
 }
 
+// ── Share to friends ──────────────────────────────────────────────────
+
+export type SharedPost = {
+  share_id: string;
+  sender: AuthorSummary;
+  post: Post;
+  is_read: boolean;
+  created_at: string;
+};
+
+export async function sharePost(postId: string, userIds: string[]): Promise<{ shared_with: number }> {
+  return requestJson(`${API_BASE_URL}/api/posts/${postId}/share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_ids: userIds }),
+  }, "Failed to share.");
+}
+
+export async function fetchShares(page = 1): Promise<PaginatedResponse<SharedPost>> {
+  return requestJson(`${API_BASE_URL}/api/shares?page=${page}`, {}, "Failed to load shares.");
+}
+
+export async function fetchUnreadShareCount(): Promise<number> {
+  const r = await requestJson<{ count: number }>(`${API_BASE_URL}/api/shares/unread-count`, {}, "Failed.");
+  return r.count;
+}
+
+export async function markSharesRead(): Promise<void> {
+  await requestJson(`${API_BASE_URL}/api/shares/mark-read`, { method: "POST" }, "Failed.");
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────
 
 export type AdminStats = {
